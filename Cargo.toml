@@ -1,0 +1,15 @@
+[package]
+name = "async-graphql-diesel-template"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+async-graphql = "7.0.2"
+async-graphql-poem = "7.0.2"
+diesel = { version = "2.1.4", features = ["postgres"] }
+diesel-derive-enum = { version = "2.1.0", features = ["postgres"] }
+dotenvy = "0.15.7"
+poem = "2.0.0"
+tokio = { version = "1.36.0", features = ["rt-multi-thread", "macros"] }
