@@ -1,9 +1,11 @@
-use async_graphql::{ComplexObject, Object, SimpleObject, Union, ID};
+use async_graphql::{
+    ComplexObject, Context, Object, Result as GraphQLResult, SimpleObject, Union, ID,
+};
 use diesel::{insert_into, pg::Pg, prelude::*};
 use uuid::Uuid;
 
 use crate::{
-    database::establish_connection,
+    connection::get_connection,
     graphql::book::{Book, DBBook},
     schema::{author, book},
 };
@@ -27,10 +29,10 @@ pub struct Author {
 
 #[ComplexObject]
 impl Author {
-    async fn books(&self) -> Vec<Book> {
-        let conn = &mut establish_connection();
+    async fn books(&self, ctx: &Context<'_>) -> GraphQLResult<Vec<Book>> {
+        let conn = &mut get_connection(ctx)?;
         let author_id = self.id.parse::<Uuid>().unwrap();
-        book::table
+        let books = book::table
             .inner_join(author::table.on(book::author_id.eq(author::id)))
             .filter(author::id.eq(author_id))
             .select(DBBook::as_select())
@@ -55,7 +57,8 @@ impl Author {
                     )
                     .collect()
             })
-            .unwrap()
+            .unwrap();
+        Ok(books)
     }
 }
 
@@ -64,10 +67,10 @@ pub struct AuthorQuery;
 
 #[Object]
 impl AuthorQuery {
-    async fn author(&self, id: ID) -> Option<Author> {
-        let conn = &mut establish_connection();
+    async fn author(&self, ctx: &Context<'_>, id: ID) -> GraphQLResult<Option<Author>> {
+        let conn = &mut get_connection(ctx)?;
         let id = id.parse::<Uuid>().unwrap();
-        author::table
+        let author = author::table
             .filter(author::id.eq(id))
             .select(DBAuthor::as_select())
             .first(conn)
@@ -83,12 +86,13 @@ impl AuthorQuery {
                     first_name,
                     last_name,
                 },
-            )
+            );
+        Ok(author)
     }
 
-    async fn authors(&self) -> Vec<Author> {
-        let conn = &mut establish_connection();
-        author::table
+    async fn authors(&self, ctx: &Context<'_>) -> GraphQLResult<Vec<Author>> {
+        let conn = &mut get_connection(ctx)?;
+        let authors = author::table
             .select(DBAuthor::as_select())
             .load(conn)
             .unwrap()
@@ -104,7 +108,8 @@ impl AuthorQuery {
                     last_name,
                 },
             )
-            .collect()
+            .collect();
+        Ok(authors)
     }
 }
 
@@ -125,9 +130,10 @@ pub struct AuthorMutation;
 impl AuthorMutation {
     async fn add_author(
         &self,
+        ctx: &Context<'_>,
         first_name: String,
         last_name: String,
-    ) -> async_graphql::Result<AddAuthorResult> {
+    ) -> GraphQLResult<AddAuthorResult> {
         #[derive(Insertable)]
         #[diesel(table_name = author)]
         #[diesel(check_for_backend(Pg))]
@@ -142,7 +148,7 @@ impl AuthorMutation {
             id: Uuid,
         }
 
-        let conn = &mut establish_connection();
+        let conn = &mut get_connection(ctx)?;
         let new_author = NewAuthor {
             first_name,
             last_name,

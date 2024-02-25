@@ -1,10 +1,13 @@
-use async_graphql::{ComplexObject, Enum as GraphQLEnum, Object, SimpleObject, Union, ID};
+use async_graphql::{
+    ComplexObject, Context, Enum as GraphQLEnum, Object, Result as GraphQLResult, SimpleObject,
+    Union, ID,
+};
 use diesel::{dsl::exists, insert_into, pg::Pg, prelude::*, select};
 use diesel_derive_enum::DbEnum;
 use uuid::Uuid;
 
 use crate::{
-    database::establish_connection,
+    connection::get_connection,
     graphql::author::{Author, DBAuthor},
     schema::{author, book, sql_types::Binding as BindingPGEnum},
 };
@@ -43,9 +46,9 @@ pub struct Book {
 
 #[ComplexObject]
 impl Book {
-    async fn author(&self) -> Author {
-        let conn = &mut establish_connection();
-        author::table
+    async fn author(&self, ctx: &Context<'_>) -> async_graphql::Result<Author> {
+        let conn = &mut get_connection(ctx)?;
+        let author = author::table
             .inner_join(book::table.on(author::id.eq(book::author_id)))
             .filter(book::id.eq(self.id))
             .select(DBAuthor::as_select())
@@ -61,7 +64,8 @@ impl Book {
                     last_name,
                 },
             )
-            .unwrap()
+            .unwrap();
+        Ok(author)
     }
 }
 
@@ -70,9 +74,9 @@ pub struct BookQuery;
 
 #[Object]
 impl BookQuery {
-    async fn book(&self, isbn: String) -> Option<Book> {
-        let conn = &mut establish_connection();
-        book::table
+    async fn book(&self, ctx: &Context<'_>, isbn: String) -> GraphQLResult<Option<Book>> {
+        let conn = &mut get_connection(ctx)?;
+        let book = book::table
             .filter(book::isbn.eq(isbn))
             .select(DBBook::as_select())
             .first(conn)
@@ -92,12 +96,13 @@ impl BookQuery {
                     description,
                     binding,
                 },
-            )
+            );
+        Ok(book)
     }
 
-    async fn books(&self) -> Vec<Book> {
-        let conn = &mut establish_connection();
-        book::table
+    async fn books(&self, ctx: &Context<'_>) -> GraphQLResult<Vec<Book>> {
+        let conn = &mut get_connection(ctx)?;
+        let books = book::table
             .select(DBBook::as_select())
             .load(conn)
             .unwrap()
@@ -117,7 +122,8 @@ impl BookQuery {
                     binding,
                 },
             )
-            .collect()
+            .collect();
+        Ok(books)
     }
 }
 
@@ -141,6 +147,7 @@ pub struct BookMutation;
 impl BookMutation {
     async fn add_book(
         &self,
+        ctx: &Context<'_>,
         author_id: ID,
         isbn: String,
         title: String,
@@ -158,7 +165,7 @@ impl BookMutation {
             binding: Binding,
         }
 
-        let conn = &mut establish_connection();
+        let conn = &mut get_connection(ctx)?;
 
         let author_id = author_id.parse::<Uuid>().unwrap();
         let author_exists = select(exists(author::table.filter(author::id.eq(author_id))))
