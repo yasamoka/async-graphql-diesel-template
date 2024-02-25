@@ -1,5 +1,6 @@
-use async_graphql::{ComplexObject, Object, SimpleObject, Union};
+use async_graphql::{ComplexObject, Object, SimpleObject, Union, ID};
 use diesel::{insert_into, pg::Pg, prelude::*};
+use uuid::Uuid;
 
 use crate::{
     database::establish_connection,
@@ -11,7 +12,7 @@ use crate::{
 #[diesel(table_name = author)]
 #[diesel(check_for_backend(Pg))]
 pub struct DBAuthor {
-    pub id: i32,
+    pub id: Uuid,
     pub first_name: String,
     pub last_name: String,
 }
@@ -19,7 +20,7 @@ pub struct DBAuthor {
 #[derive(SimpleObject)]
 #[graphql(complex)]
 pub struct Author {
-    pub id: i32,
+    pub id: ID,
     pub first_name: String,
     pub last_name: String,
 }
@@ -28,9 +29,10 @@ pub struct Author {
 impl Author {
     async fn books(&self) -> Vec<Book> {
         let conn = &mut establish_connection();
+        let author_id = self.id.parse::<Uuid>().unwrap();
         book::table
             .inner_join(author::table.on(book::author_id.eq(author::id)))
-            .filter(author::id.eq(self.id))
+            .filter(author::id.eq(author_id))
             .select(DBBook::as_select())
             .load(conn)
             .map(|mut books| {
@@ -62,8 +64,9 @@ pub struct AuthorQuery;
 
 #[Object]
 impl AuthorQuery {
-    async fn author(&self, id: i32) -> Option<Author> {
+    async fn author(&self, id: ID) -> Option<Author> {
         let conn = &mut establish_connection();
+        let id = id.parse::<Uuid>().unwrap();
         author::table
             .filter(author::id.eq(id))
             .select(DBAuthor::as_select())
@@ -76,7 +79,7 @@ impl AuthorQuery {
                      first_name,
                      last_name,
                  }| Author {
-                    id,
+                    id: id.into(),
                     first_name,
                     last_name,
                 },
@@ -96,7 +99,7 @@ impl AuthorQuery {
                      first_name,
                      last_name,
                  }| Author {
-                    id,
+                    id: id.into(),
                     first_name,
                     last_name,
                 },
@@ -110,11 +113,9 @@ enum AddAuthorResult {
     Success(AddAuthorSuccess),
 }
 
-#[derive(Selectable, Queryable, SimpleObject)]
-#[diesel(table_name = author)]
-#[diesel(check_for_backend(Pg))]
+#[derive(SimpleObject)]
 struct AddAuthorSuccess {
-    id: i32,
+    id: ID,
 }
 
 #[derive(Default)]
@@ -135,6 +136,12 @@ impl AuthorMutation {
             last_name: String,
         }
 
+        #[derive(Selectable, Queryable)]
+        #[diesel(table_name = author)]
+        struct AuthorReturn {
+            id: Uuid,
+        }
+
         let conn = &mut establish_connection();
         let new_author = NewAuthor {
             first_name,
@@ -142,9 +149,9 @@ impl AuthorMutation {
         };
         let result = insert_into(author::table)
             .values(&new_author)
-            .returning(AddAuthorSuccess::as_returning())
+            .returning(AuthorReturn::as_returning())
             .get_result(conn)
-            .map(|success| AddAuthorResult::Success(success))?;
+            .map(|ret| AddAuthorResult::Success(AddAuthorSuccess { id: ret.id.into() }))?;
         Ok(result)
     }
 }

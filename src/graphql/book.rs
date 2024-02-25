@@ -1,6 +1,7 @@
-use async_graphql::{ComplexObject, Enum as GraphQLEnum, Object, SimpleObject, Union};
+use async_graphql::{ComplexObject, Enum as GraphQLEnum, Object, SimpleObject, Union, ID};
 use diesel::{dsl::exists, insert_into, pg::Pg, prelude::*, select};
 use diesel_derive_enum::DbEnum;
+use uuid::Uuid;
 
 use crate::{
     database::establish_connection,
@@ -55,7 +56,7 @@ impl Book {
                      first_name,
                      last_name,
                  }| Author {
-                    id,
+                    id: id.into(),
                     first_name,
                     last_name,
                 },
@@ -140,7 +141,7 @@ pub struct BookMutation;
 impl BookMutation {
     async fn add_book(
         &self,
-        author_id: i32,
+        author_id: ID,
         isbn: String,
         title: String,
         description: Option<String>,
@@ -150,7 +151,7 @@ impl BookMutation {
         #[diesel(table_name = book)]
         #[diesel(check_for_backend(Sqlite))]
         struct NewBook {
-            author_id: i32,
+            author_id: Uuid,
             isbn: String,
             title: String,
             description: Option<String>,
@@ -159,6 +160,7 @@ impl BookMutation {
 
         let conn = &mut establish_connection();
 
+        let author_id = author_id.parse::<Uuid>().unwrap();
         let author_exists = select(exists(author::table.filter(author::id.eq(author_id))))
             .get_result::<bool>(conn)?;
         match author_exists {
@@ -180,7 +182,7 @@ impl BookMutation {
                 Ok(result)
             }
             false => Ok(AddBookResult::AuthorNotFound(AuthorNotFoundError {
-                id: author_id,
+                id: author_id.into(),
             })),
         }
     }

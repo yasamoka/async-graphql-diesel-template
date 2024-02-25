@@ -8,7 +8,7 @@ pub mod sql_types {
 
 diesel::table! {
     author (id) {
-        id -> Int4,
+        id -> Uuid,
         first_name -> Text,
         last_name -> Text,
     }
@@ -20,7 +20,7 @@ diesel::table! {
 
     book (id) {
         id -> Int4,
-        author_id -> Int4,
+        author_id -> Uuid,
         isbn -> Text,
         title -> Text,
         description -> Nullable<Text>,

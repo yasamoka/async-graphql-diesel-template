@@ -8,8 +8,10 @@ edition = "2021"
 [dependencies]
 async-graphql = "7.0.2"
 async-graphql-poem = "7.0.2"
-diesel = { version = "2.1.4", features = ["postgres"] }
+diesel = { version = "2.1.4", features = ["postgres", "uuid"] }
 diesel-derive-enum = { version = "2.1.0", features = ["postgres"] }
 dotenvy = "0.15.7"
 poem = "2.0.0"
+serde_json = "1.0.114"
 tokio = { version = "1.36.0", features = ["rt-multi-thread", "macros"] }
+uuid = "1.7.0"

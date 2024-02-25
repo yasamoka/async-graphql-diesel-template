@@ -1,4 +1,4 @@
-use async_graphql::SimpleObject;
+use async_graphql::{SimpleObject, ID};
 
 #[derive(SimpleObject)]
 pub struct DBError {
@@ -25,5 +25,5 @@ impl From<DBError> for async_graphql::Error {
 
 #[derive(SimpleObject)]
 pub struct AuthorNotFoundError {
-    pub id: i32,
+    pub id: ID,
 }
