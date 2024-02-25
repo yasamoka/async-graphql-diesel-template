@@ -149,7 +149,7 @@ impl BookMutation {
     ) -> async_graphql::Result<AddBookResult> {
         #[derive(Insertable)]
         #[diesel(table_name = book)]
-        #[diesel(check_for_backend(Sqlite))]
+        #[diesel(check_for_backend(Pg))]
         struct NewBook {
             author_id: Uuid,
             isbn: String,
